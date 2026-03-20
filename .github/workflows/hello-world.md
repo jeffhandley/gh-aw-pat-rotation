@@ -11,6 +11,9 @@ network:
 
 safe-outputs:
   noop:
+
+metadata:
+  copilot-pat-pool: HELLO
 ---
 
 ## Hello World - Baby Name Rhyme Generator
