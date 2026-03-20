@@ -77,6 +77,15 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('${{ runner.temp }}/gh-aw/actions/generate_aw_info.cjs');
             await main(core, context);
+      - name: Checkout .github and .agents folders
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github
+            .agents
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
       - name: Select Copilot token from pool
         id: select-copilot-pat
         uses: ./.github/actions/select-copilot-pat
@@ -93,15 +102,6 @@ jobs:
           COPILOT_PAT_7: ${{ secrets.COPILOT_HELLO_7 }}
           COPILOT_PAT_8: ${{ secrets.COPILOT_HELLO_8 }}
           COPILOT_PAT_9: ${{ secrets.COPILOT_HELLO_9 }}
-      - name: Checkout .github and .agents folders
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-          sparse-checkout: |
-            .github
-            .agents
-          sparse-checkout-cone-mode: true
-          fetch-depth: 1
       - name: Check workflow file timestamps
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
