@@ -75,10 +75,10 @@ function Apply-Edits {
         return
     }
 
-    # 1. Replace secret_verification_result output and add selected_token
+    # 1. Replace secret_verification_result output to use select-copilot-pat step
     $lockContent = $lockContent -replace `
         'secret_verification_result: \$\{\{ steps\.validate-secret\.outputs\.verification_result \}\}', `
-        "secret_verification_result: `${{ steps.select-copilot-pat.outputs.token != '' && 'valid' || 'missing' }}`n      selected_token: `${{ steps.select-copilot-pat.outputs.token }}"
+        "secret_verification_result: `${{ steps.select-copilot-pat.outputs.token != '' && 'valid' || 'missing' }}"
 
     # 2. Remove the validate-secret step entirely
     $validatePattern = '(?s)      - name: Validate COPILOT_GITHUB_TOKEN secret\r?\n        id: validate-secret\r?\n        run: [^\n]+\r?\n        env:\r?\n          COPILOT_GITHUB_TOKEN: \$\{\{ secrets\.COPILOT_GITHUB_TOKEN \}\}\r?\n'
@@ -100,7 +100,7 @@ function Apply-Edits {
 $secretEnvLines
 "@
 
-    # Insert after the first "fetch-depth: 1" line (end of checkout step)
+    # Insert after the first "fetch-depth: 1" line (end of activation checkout step)
     $insertAfter = '          fetch-depth: 1'
     $idx = $lockContent.IndexOf($insertAfter)
     if ($idx -ge 0) {
@@ -111,10 +111,25 @@ $secretEnvLines
         $lockContent = $lockContent.Substring(0, $insertPos) + $selectStep + "`n" + $lockContent.Substring($insertPos)
     }
 
-    # 4. Replace all remaining secrets.COPILOT_GITHUB_TOKEN references
+    # 4. Insert select-copilot-pat in the agent job after its checkout step.
+    #    The agent job's checkout is "Checkout repository" with persist-credentials: false
+    #    and no further with: properties. Find "Checkout repository" then insert after the
+    #    next "persist-credentials: false" line.
+    $checkoutRepoIdx = $lockContent.IndexOf('- name: Checkout repository')
+    if ($checkoutRepoIdx -ge 0) {
+        $persistIdx = $lockContent.IndexOf('persist-credentials: false', $checkoutRepoIdx)
+        if ($persistIdx -ge 0) {
+            $insertPos = $persistIdx + 'persist-credentials: false'.Length
+            if ($insertPos -lt $lockContent.Length -and $lockContent[$insertPos] -eq "`r") { $insertPos++ }
+            if ($insertPos -lt $lockContent.Length -and $lockContent[$insertPos] -eq "`n") { $insertPos++ }
+            $lockContent = $lockContent.Substring(0, $insertPos) + $selectStep + "`n" + $lockContent.Substring($insertPos)
+        }
+    }
+
+    # 5. Replace all secrets.COPILOT_GITHUB_TOKEN references
     $lockContent = $lockContent -replace `
         '\$\{\{ secrets\.COPILOT_GITHUB_TOKEN \}\}', `
-        '${{ needs.activation.outputs.selected_token }}'
+        '${{ steps.select-copilot-pat.outputs.token }}'
 
     Set-Content -Path $lockFile -Value $lockContent -NoNewline
 

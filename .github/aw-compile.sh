@@ -73,9 +73,9 @@ $(for i in $(seq 0 9); do echo "          COPILOT_PAT_${i}: \${{ secrets.COPILOT
 STEP_EOF
     )
 
-    # 1. Replace secret_verification_result output and add selected_token
+    # 1. Replace secret_verification_result output to use select-copilot-pat step
     sed -i.bak \
-        's|secret_verification_result: ${{ steps.validate-secret.outputs.verification_result }}|secret_verification_result: ${{ steps.select-copilot-pat.outputs.token != '"'"''"'"' \&\& '"'"'valid'"'"' || '"'"'missing'"'"' }}\n      selected_token: ${{ steps.select-copilot-pat.outputs.token }}|' \
+        's|secret_verification_result: ${{ steps.validate-secret.outputs.verification_result }}|secret_verification_result: ${{ steps.select-copilot-pat.outputs.token != '"'"''"'"' \&\& '"'"'valid'"'"' || '"'"'missing'"'"' }}|' \
         "$lock_file"
 
     # 2. Remove the validate-secret step entirely
@@ -88,7 +88,7 @@ STEP_EOF
     { print }
     ' "$lock_file" > "${lock_file}.tmp" && mv "${lock_file}.tmp" "$lock_file"
 
-    # 3. Insert select-copilot-pat step after the checkout step (after fetch-depth: 1)
+    # 3. Insert select-copilot-pat step after the activation checkout (after fetch-depth: 1)
     awk -v step="$select_step" '
     { print }
     /fetch-depth: 1/ && !inserted {
@@ -97,9 +97,20 @@ STEP_EOF
     }
     ' "$lock_file" > "${lock_file}.tmp" && mv "${lock_file}.tmp" "$lock_file"
 
-    # 4. Replace all remaining secrets.COPILOT_GITHUB_TOKEN references
+    # 4. Insert select-copilot-pat step in the agent job after its checkout.
+    #    Find "Checkout repository" then insert after the next "persist-credentials: false".
+    awk -v step="$select_step" '
+    { print }
+    /Checkout repository/ { found_checkout_repo = 1 }
+    found_checkout_repo && /persist-credentials: false/ && !agent_inserted {
+        print step
+        agent_inserted = 1
+    }
+    ' "$lock_file" > "${lock_file}.tmp" && mv "${lock_file}.tmp" "$lock_file"
+
+    # 5. Replace all secrets.COPILOT_GITHUB_TOKEN references
     sed -i.bak \
-        's|\${{ secrets\.COPILOT_GITHUB_TOKEN }}|\${{ needs.activation.outputs.selected_token }}|g' \
+        's|\${{ secrets\.COPILOT_GITHUB_TOKEN }}|\${{ steps.select-copilot-pat.outputs.token }}|g' \
         "$lock_file"
 
     # Clean up backup files
