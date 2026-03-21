@@ -1,32 +1,25 @@
----
-permissions:
-  contents: read
+# Select Copilot PAT
+Selects a random Copilot PAT from a numbered pool of secrets. This
+addresses limitations that arise from having a single PAT shared
+across all agentic workflows, such as rate-limiting.
 
-network:
-  allowed:
-    - defaults
+**This is a stop-gap workaround.** As soon as organization/enterprise
+billing is offered for agentic workflows, this approach will be removed
+from our workflows.
 
-safe-outputs:
-  noop:
+## Usage
+Add the following frontmatter at the top-level of an agentic workflow.
+These elements are not supported through [imports][1], so they must be
+copied into all workflows.
 
+Up to 10 `SECRET_#` environment variables can be passed to the action,
+numbered 0-9. Different workflows can use different pools of PATs if
+desired. Change the `secrets.COPILOT_PAT_0` through `secrets.COPILOT_PAT_9`
+secret names in both the `select-copilot-pat` step `env` values and in the
+`case` expression under the `engine: env` configuration.
+
+```yml
 on:
-  workflow_dispatch:
-    inputs:
-      year:
-        description: 'Year to pick a random song from (e.g. 1985)'
-        required: true
-        type: string
-
-# ###############################################################
-# Override the GITHUB_COPILOT_TOKEN secret usage for the workflow
-# with a randomly-selected token from a pool of secrets.
-#
-# As soon as organization-level billing is offered for Agentic
-# Workflows, this stop-gap approach will be removed.
-#
-# See: /.github/actions/select-copilot-pat/README.md
-# ###############################################################
-
   # Add the pre-activation step of selecting a random PAT from the supplied secrets
   steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -41,6 +34,8 @@ on:
       name: Select Copilot token from pool
       uses: ./.github/actions/select-copilot-pat
       env:
+        # If the secret names are changed here, they must also be changed
+        # in the `engine: env` case expression
         SECRET_0: ${{ secrets.COPILOT_PAT_0 }}
         SECRET_1: ${{ secrets.COPILOT_PAT_1 }}
         SECRET_2: ${{ secrets.COPILOT_PAT_2 }}
@@ -66,22 +61,24 @@ engine:
     # We cannot use line breaks in this expression as it leads to a syntax error in the compiled workflow
     # If none of the `COPILOT_PAT_#` secrets were selected, then the default COPILOT_GITHUB_TOKEN is used
     COPILOT_GITHUB_TOKEN: ${{ case(needs.pre_activation.outputs.copilot_pat_number == '0', secrets.COPILOT_PAT_0, needs.pre_activation.outputs.copilot_pat_number == '1', secrets.COPILOT_PAT_1, needs.pre_activation.outputs.copilot_pat_number == '2', secrets.COPILOT_PAT_2, needs.pre_activation.outputs.copilot_pat_number == '3', secrets.COPILOT_PAT_3, needs.pre_activation.outputs.copilot_pat_number == '4', secrets.COPILOT_PAT_4, needs.pre_activation.outputs.copilot_pat_number == '5', secrets.COPILOT_PAT_5, needs.pre_activation.outputs.copilot_pat_number == '6', secrets.COPILOT_PAT_6, needs.pre_activation.outputs.copilot_pat_number == '7', secrets.COPILOT_PAT_7, needs.pre_activation.outputs.copilot_pat_number == '8', secrets.COPILOT_PAT_8, needs.pre_activation.outputs.copilot_pat_number == '9', secrets.COPILOT_PAT_9, secrets.COPILOT_GITHUB_TOKEN) }}
----
+```
 
-## Random Song Picker
+## References
 
-You are a fun, enthusiastic music DJ AI assistant with deep knowledge of popular music across all decades.
+- [Agentic Workflow Imports][1]
+- [Custom Steps][2]
+- [Custom Jobs][3]
+- [Job Outputs][4]
+- [Engine Configuration][5]
+- [Engine Environment Variables][6]
+- [Case Function in Workflow Expressions][7]
+- [Update agentic engine token handling to use user-provided secrets (github/gh-aw#18017)][8]
 
-### Your Task
-
-1. **Read the year**: The user has provided a year via the workflow input: `${{ github.event.inputs.year }}`. Use this year to guide your song selection.
-
-2. **Pick a random song**: Choose a random well-known song that was popular or released during that year. Pick from a wide variety of genres — pop, rock, hip-hop, R&B, country, electronic, etc. Don't always pick the most obvious #1 hit; be creative and surprising with your selection.
-
-3. **Present the song**: Share the song with enthusiasm! Include:
-   - 🎵 **Song title** and **artist**
-   - 📅 The year
-   - 🎶 A brief, fun description of why this song was notable or what makes it great (2-3 sentences)
-   - 💡 A fun fact or piece of trivia about the song or artist
-
-4. **Report your output**: Call the `noop` tool with a message containing all of the above, well-formatted with markdown so it renders nicely in the GitHub Actions step summary.
+[1]: https://github.github.com/gh-aw/reference/imports/
+[2]: https://github.github.com/gh-aw/reference/frontmatter/#custom-steps-steps
+[3]: https://github.github.com/gh-aw/reference/frontmatter/#custom-jobs-jobs
+[4]: https://github.github.com/gh-aw/reference/frontmatter/#job-outputs
+[5]: https://github.github.com/gh-aw/reference/frontmatter/#ai-engine-engine
+[6]: https://github.github.com/gh-aw/reference/engines/#engine-environment-variables
+[7]: https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#case
+[8]: https://github.com/github/gh-aw/pull/18017

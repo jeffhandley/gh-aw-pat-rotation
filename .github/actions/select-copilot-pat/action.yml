@@ -1,67 +1,53 @@
 name: 'Select Copilot PAT from Pool'
 description: >
-  Selects a Copilot PAT from a numbered pool of secrets using round-robin
-  with random fallback. Secrets are passed as environment variables
-  COPILOT_PAT_0 through COPILOT_PAT_9 by the calling workflow step.
+  Selects a random Copilot PAT from a numbered pool of secrets. Secrets
+  are passed as environment variables SECRET_0 through SECRET_9
+  by the calling workflow step.
 
 inputs:
-  run-number:
-    description: 'Run number for deterministic round-robin selection (typically github.run_number). Falls back to random if empty.'
+  random-seed:
+    description: 'A seed number to use for the random PAT selection, for deterministic selection if needed.'
     required: false
     default: ''
 
 outputs:
-  token:
-    description: 'The selected token value (masked in logs)'
-    value: ${{ steps.select.outputs.token }}
-  pool-size:
-    description: 'The number of non-empty secrets found in the pool'
-    value: ${{ steps.select.outputs.pool_size }}
+  copilot_pat_number:
+    description: 'The 0-9 secret number selected from the pool of specified secrets'
+    value: ${{ steps.select-pat-number.outputs.copilot_pat_number }}
 
 runs:
   using: composite
   steps:
-    - id: select
+    - id: select-pat-number
       shell: bash
       env:
-        RUN_NUMBER: ${{ inputs.run-number }}
+        RANDOM_SEED: ${{ inputs.random-seed }}
       run: |
-        # Collect all non-empty secret values from COPILOT_PAT_0..COPILOT_PAT_9
-        TOKENS=()
+        # Collect all secret numbers with non-empty values from SELECT_0..SECRET_9
+        PAT_NUMBERS=()
         for i in $(seq 0 9); do
-          var="COPILOT_PAT_${i}"
+          var="SECRET_${i}"
           val="${!var}"
           if [ -n "$val" ]; then
-            TOKENS+=("$val")
+            PAT_NUMBERS+=(${i})
           fi
         done
 
-        if [ ${#TOKENS[@]} -eq 0 ]; then
-          echo "::error::No Copilot PAT secrets found (checked COPILOT_PAT_0 through COPILOT_PAT_9)"
-          exit 1
+        # If none of the secrets in the pool have values, then emit a warning and do not
+        # set an output value. The consumer can then fall back to using COPILOT_GITHUB_TOKEN.
+        if [ ${#PAT_NUMBERS[@]} -eq 0 ]; then
+          echo "::warning::None of the specified secrets had values (checked SECRET_0 through SECRET_9)"
+          exit 0
         fi
 
-        # Round-robin by run number; fall back to random
-        if [ -n "$RUN_NUMBER" ]; then
-          IDX=$(( RUN_NUMBER % ${#TOKENS[@]} ))
-          METHOD="round-robin (run #${RUN_NUMBER})"
-        else
-          IDX=$(( RANDOM % ${#TOKENS[@]} ))
-          METHOD="random"
+        # Select a random index using the seed if specified
+        if [ -n "$RANDOM_SEED" ]; then
+          RANDOM=$RANDOM_SEED
         fi
 
-        SELECTED="${TOKENS[$IDX]}"
-        echo "Selected token ${IDX} via ${METHOD} (pool size: ${#TOKENS[@]})"
+        PAT_INDEX=$(( RANDOM % ${#PAT_NUMBERS[@]} ))
+        PAT_NUMBER="${PAT_NUMBERS[$PAT_INDEX]}"
+        echo "Selected token ${PAT_NUMBER} (index: ${PAT_INDEX}; pool size: ${#PAT_NUMBERS[@]})"
 
-        # Verify: must be a fine-grained PAT (prefix github_pat_)
-        if [[ "$SELECTED" != github_pat_* ]]; then
-          echo "::error::Selected token is not a fine-grained PAT (expected github_pat_ prefix). Classic PATs are not allowed."
-          exit 1
-        fi
-
-        # Mask the token value so it never appears in logs
-        echo "::add-mask::${SELECTED}"
-
-        # Set outputs
-        echo "token=${SELECTED}" >> "$GITHUB_OUTPUT"
-        echo "pool_size=${#TOKENS[@]}" >> "$GITHUB_OUTPUT"
+        # Set the PAT number as the output
+        echo "copilot_pat_number=${PAT_NUMBER}" >> "$GITHUB_OUTPUT"
