@@ -8,6 +8,7 @@ network:
 
 safe-outputs:
   noop:
+    report-as-issue: false
 
 on:
   workflow_dispatch:
