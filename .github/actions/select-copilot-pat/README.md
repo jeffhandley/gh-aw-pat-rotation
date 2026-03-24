@@ -1,22 +1,39 @@
 # Select Copilot PAT
-Selects a random Copilot PAT from a numbered pool of secrets. This
-addresses limitations that arise from having a single PAT shared
-across all agentic workflows, such as rate-limiting.
+Selects a random Copilot PAT from a numbered pool of secrets. This addresses limitations that arise from having a single PAT shared across all agentic workflows, such as rate-limiting.
 
-**This is a stop-gap workaround.** As soon as organization/enterprise
-billing is offered for agentic workflows, this approach will be removed
-from our workflows.
+**This is a stop-gap workaround.** As soon as organization/enterprise billing is offered for agentic workflows, this approach will be removed from our workflows.
+
+## Repository Onboarding
+To use Agentic Workflows in a dotnet org repository:
+
+1. Follow the instructions for [Configuring Your Repository | Agentic Authoring | GitHub Agentic Workflows][configure-repo].
+2. Copy this `select-copilot-pat` folder into the repository under `.github/actions/select-copilot-pat`, including both the `README.md` and `action.yml`.
+3. Merge those additions into the repository and then follow the instructions for the PAT Creation and Usage below.
+
+## PAT Management
+Team members provide PATs into the pools for the repository by adding them as repository secrets with secret names matching the pattern of `<pool_name>_<0-9>`, such as `COPILOT_PAT_0`.
+
+[Use this link to prefill the PAT creation form with the required settings][create-pat]:
+
+1. **Resource owner** is your **user account**, not an organization.
+2. **Copilot Requests (Read)** must be the only permission granted.
+3. **8-day expiration** must be used, which enforces a weekly renewal.
+4. **Repository access** set to **Public repositories** only.
+
+The **Token Name** _does not_ need to match the secret name and is only visible to the owner of the PAT. It's recommended to use a token name indicating the PAT is used for dotnet org agentic workflows. The **Description** is also only used for your own reference.
+
+Team members providing PATs for workflows should set weekly recurring reminders to regenerate and update their PATs in the repository secrets. With an 8-day expiration, renewal can be done on the same day each week.
+
+PATs are added to repositories through the **Settings > Secrets and variables > Actions** UI, saved as **Repository secrets** and matching the `<pool_name>_<0-9>` naming convention. This can be also be done using the GitHub CLI.
+
+```sh
+gh aw secrets set "<pool_name>_<0-9>" --value "<your-github-pat>" --repo dotnet/<repo>
+```
 
 ## Usage
-Add the following frontmatter at the top-level of an agentic workflow.
-These elements are not supported through [imports][1], so they must be
-copied into all workflows.
+Add the following frontmatter at the top-level of an agentic workflow. These elements are not supported through [imports][imports], so they must be copied into all workflows.
 
-Up to 10 `SECRET_#` environment variables can be passed to the action,
-numbered 0-9. Different workflows can use different pools of PATs if
-desired. Change the `secrets.COPILOT_PAT_0` through `secrets.COPILOT_PAT_9`
-secret names in both the `select-copilot-pat` step `env` values and in the
-`case` expression under the `engine: env` configuration.
+Up to 10 `SECRET_#` environment variables can be passed to the action, numbered 0-9. Different workflows can use different pools of PATs if desired. Change the `secrets.COPILOT_PAT_0` through `secrets.COPILOT_PAT_9` secret names in both the `select-copilot-pat` step `env` values and in the `case` expression under the `engine: env` configuration.
 
 ```yml
 on:
@@ -65,20 +82,25 @@ engine:
 
 ## References
 
-- [Agentic Workflow Imports][1]
-- [Custom Steps][2]
-- [Custom Jobs][3]
-- [Job Outputs][4]
-- [Engine Configuration][5]
-- [Engine Environment Variables][6]
-- [Case Function in Workflow Expressions][7]
-- [Update agentic engine token handling to use user-provided secrets (github/gh-aw#18017)][8]
+- [Agentic Authoring][configure-repo]
+- [Authentication][authentication]
+- [Agentic Workflow Imports][imports]
+- [Custom Steps][steps]
+- [Custom Jobs][jobs]
+- [Job Outputs][job-outputs]
+- [Engine Configuration][engine]
+- [Engine Environment Variables][engine-vars]
+- [Case Function in Workflow Expressions][case-expression]
+- [Update agentic engine token handling to use user-provided secrets (github/gh-aw#18017)][secret-override]
 
-[1]: https://github.github.com/gh-aw/reference/imports/
-[2]: https://github.github.com/gh-aw/reference/frontmatter/#custom-steps-steps
-[3]: https://github.github.com/gh-aw/reference/frontmatter/#custom-jobs-jobs
-[4]: https://github.github.com/gh-aw/reference/frontmatter/#job-outputs
-[5]: https://github.github.com/gh-aw/reference/frontmatter/#ai-engine-engine
-[6]: https://github.github.com/gh-aw/reference/engines/#engine-environment-variables
-[7]: https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#case
-[8]: https://github.com/github/gh-aw/pull/18017
+[configure-repo]: https://github.github.com/gh-aw/guides/agentic-authoring/#configuring-your-repository
+[authentication]: https://github.github.com/gh-aw/reference/auth/
+[create-pat]: https://github.com/settings/personal-access-tokens/new?name=dotnet%20org%20agentic%20workflows&description=GitHub+Agentic+Workflows+-+Copilot+engine+authentication.++Used+for+dotnet+org+workflows.+MUST+be+configured+with+only+Copilot+Requests+permissions+and+user+account+as+resource+owner.+Weekly+expiration+and+required+renewal.&user_copilot_requests=read&expires_in=8
+[imports]: https://github.github.com/gh-aw/reference/imports/
+[steps]: https://github.github.com/gh-aw/reference/frontmatter/#custom-steps-steps
+[jobs]: https://github.github.com/gh-aw/reference/frontmatter/#custom-jobs-jobs
+[job-outputs]: https://github.github.com/gh-aw/reference/frontmatter/#job-outputs
+[engine]: https://github.github.com/gh-aw/reference/frontmatter/#ai-engine-engine
+[engine-vars]: https://github.github.com/gh-aw/reference/engines/#engine-environment-variables
+[case-expression]: https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#case
+[secret-override]: https://github.com/github/gh-aw/pull/18017
